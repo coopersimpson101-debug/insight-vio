@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "insight-vio"
+version = "0.1.0"
+description = "Inside-out 6DoF tracking (stereo MSCKF visual-inertial odometry) for DIY VR headsets"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "pyyaml>=6"]
+
+[project.optional-dependencies]
+io = ["opencv-python-headless>=4.8"]   # image decode / camera I/O only
+dev = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+include = ["insight_vio*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+# data / outputs
+data/
+results/
+*.bag
+*.zip
+estimate_tum.txt
+trajectory.html
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

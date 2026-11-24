@@ -1,0 +1,57 @@
+# Raspberry Pi 5 + 2x OV9281 global-shutter mono (CAM0/CAM1) + BMI088 on SPI0.
+# !!! ALL CALIBRATION VALUES BELOW ARE PLACEHOLDERS !!!
+# Run the Kalibr workflow in docs/calibration.md, then:
+#   python scripts/kalibr_to_config.py camchain-imucam.yaml imu.yaml --base configs/pi5_ov9281_bmi088.yaml -o configs/my_headset.yaml
+cameras:
+  - name: left
+    distortion_model: equidistant          # wide M12 lenses: use Kalibr pinhole-equi
+    intrinsics: [640.0, 640.0, 639.5, 399.5]   # PLACEHOLDER
+    distortion: [0.0, 0.0, 0.0, 0.0]           # PLACEHOLDER
+    resolution: [1280, 800]
+    T_imu_cam:                                 # PLACEHOLDER: forward-looking, 4.5 cm left of IMU
+      - [0.0, 0.0, 1.0, 0.02]
+      - [-1.0, 0.0, 0.0, 0.045]
+      - [0.0, -1.0, 0.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]
+  - name: right
+    distortion_model: equidistant
+    intrinsics: [640.0, 640.0, 639.5, 399.5]
+    distortion: [0.0, 0.0, 0.0, 0.0]
+    resolution: [1280, 800]
+    T_imu_cam:
+      - [0.0, 0.0, 1.0, 0.02]
+      - [-1.0, 0.0, 0.0, -0.045]
+      - [0.0, -1.0, 0.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]
+imu:
+  rate_hz: 400
+  # BMI088 datasheet typicals inflated x2-x5 (Kalibr wants inflated values too);
+  # replace with an Allan-variance fit (docs/calibration.md).
+  gyro_noise: 3.0e-04
+  accel_noise: 2.0e-03
+  gyro_walk: 2.0e-05
+  accel_walk: 4.0e-04
+time_offset: 0.0             # from Kalibr timeshift_cam_imu
+filter: {max_clones: 11, pixel_sigma: 1.5, chi2_prob: 0.95}
+frontend:
+  max_features: 120          # Python front-end budget; raise for the C++ port
+  fast_threshold: 15
+  pyramid_levels: 4
+hardware:
+  platform: pi5
+  camera_driver: picamera2
+  width: 640                 # bin 2x2 for the Python prototype
+  height: 400
+  fps: 30
+  exposure_us: 3000          # short exposure for VR head motion (motion blur!)
+  hardware_sync: true        # see docs/hardware.md (FSIN / XVS trigger wiring)
+  imu_driver: bmi088
+  spi_bus: 0
+  spi_cs_accel: 0
+  spi_cs_gyro: 1
+  imu_drdy_gpio: 23
+  R_body_imu: [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+output:
+  udp_host: 127.0.0.1        # where Monado / your runtime listens
+  udp_port: 5555
+  openxr_axes: true

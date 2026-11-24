@@ -1,0 +1,44 @@
+# Jetson Orin Nano + 2x OV9281 (CSI, Argus) or a USB global-shutter stereo pair + ICM-42688-P on SPI.
+# !!! ALL CALIBRATION VALUES BELOW ARE PLACEHOLDERS - run Kalibr (docs/calibration.md) !!!
+cameras:
+  - name: left
+    distortion_model: equidistant
+    intrinsics: [640.0, 640.0, 639.5, 399.5]
+    distortion: [0.0, 0.0, 0.0, 0.0]
+    resolution: [1280, 800]
+    T_imu_cam:
+      - [0.0, 0.0, 1.0, 0.02]
+      - [-1.0, 0.0, 0.0, 0.045]
+      - [0.0, -1.0, 0.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]
+  - name: right
+    distortion_model: equidistant
+    intrinsics: [640.0, 640.0, 639.5, 399.5]
+    distortion: [0.0, 0.0, 0.0, 0.0]
+    resolution: [1280, 800]
+    T_imu_cam:
+      - [0.0, 0.0, 1.0, 0.02]
+      - [-1.0, 0.0, 0.0, -0.045]
+      - [0.0, -1.0, 0.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]
+imu:
+  rate_hz: 1000
+  gyro_noise: 1.5e-04        # ICM-42688-P datasheet ~2.8 mdps/sqrt(Hz), inflated; PLACEHOLDER
+  accel_noise: 1.5e-03
+  gyro_walk: 1.0e-05
+  accel_walk: 2.0e-04
+time_offset: 0.0
+filter: {max_clones: 11, pixel_sigma: 1.5, chi2_prob: 0.95}
+frontend: {max_features: 150, fast_threshold: 15, pyramid_levels: 4}
+hardware:
+  platform: jetson_orin_nano
+  camera_driver: opencv_gstreamer   # nvarguscamerasrc sensor-id=0/1, see insight_vio/hw/cameras.py
+  width: 1280
+  height: 800
+  fps: 30
+  imu_driver: icm42688
+  spi_bus: 0
+  spi_cs: 0
+  imu_drdy_gpio: null
+  R_body_imu: [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+output: {udp_host: 127.0.0.1, udp_port: 5555, openxr_axes: true}

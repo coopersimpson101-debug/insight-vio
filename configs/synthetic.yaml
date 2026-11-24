@@ -1,0 +1,23 @@
+# Matches insight_vio.sim defaults (640x480, f=400, 6.4 cm baseline, cameras looking along body +x).
+cameras:
+  - name: left
+    distortion_model: none
+    intrinsics: [400.0, 400.0, 319.5, 239.5]
+    resolution: [640, 480]
+    T_imu_cam:
+      - [0.0, 0.0, 1.0, 0.06]
+      - [-1.0, 0.0, 0.0, 0.032]
+      - [0.0, -1.0, 0.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]
+  - name: right
+    distortion_model: none
+    intrinsics: [400.0, 400.0, 319.5, 239.5]
+    resolution: [640, 480]
+    T_imu_cam:
+      - [0.0, 0.0, 1.0, 0.06]
+      - [-1.0, 0.0, 0.0, -0.032]
+      - [0.0, -1.0, 0.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]
+imu: {rate_hz: 200, gyro_noise: 1.6968e-04, accel_noise: 2.0e-03, gyro_walk: 1.9393e-05, accel_walk: 3.0e-03}
+time_offset: 0.0
+filter: {max_clones: 11, pixel_sigma: 1.0, chi2_prob: 0.95}
