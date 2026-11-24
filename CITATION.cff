@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "insight-vio: Stereo MSCKF visual-inertial odometry for DIY inside-out VR headsets"
+type: software
+authors:
+  - name: "the insight-vio authors"
+license: MIT
+repository-code: "https://github.com/coopersimpson101-debug/insight-vio"
+version: 0.1.0
+keywords:
+  - visual-inertial odometry
+  - MSCKF
+  - Kalman filter
+  - VR
+  - SLAM
+  - robotics

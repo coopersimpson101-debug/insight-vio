@@ -1,37 +1,107 @@
-# insight-vio
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="insight-vio: stereo MSCKF visual-inertial odometry for a DIY inside-out VR headset" width="100%">
+</p>
 
-**Inside-out 6DoF tracking for a DIY VR headset.** Two global-shutter cameras plus an IMU
-on a Raspberry Pi 5 or Jetson Orin Nano, and the headset tracks itself in space with no
-base stations or lighthouses. insight-vio is a stereo **visual-inertial odometry** stack
-built around a hand-written **MSCKF** (Multi-State Constraint Kalman Filter), the same
-filter family behind Google Tango and many open-source headset trackers.
+<p align="center">
+  <a href="https://github.com/coopersimpson101-debug/insight-vio/actions/workflows/ci.yml"><img src="https://github.com/coopersimpson101-debug/insight-vio/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/python-3.10%20%7C%203.12-3776AB?logo=python&logoColor=white" alt="Python 3.10 | 3.12">
+  <img src="https://img.shields.io/badge/deps-numpy%20%2B%20pyyaml-34D399" alt="Dependencies: numpy + pyyaml">
+  <img src="https://img.shields.io/badge/synthetic%20ATE-0.50%20cm-34D399" alt="Synthetic ATE 0.50 cm">
+  <img src="https://img.shields.io/badge/hardware-not%20yet%20validated-lightgrey" alt="Hardware: not yet validated">
+</p>
 
-Everything that does the estimation is written from scratch in numpy, and the code is laid
-out so it can be ported to C++ module by module:
+**Inside-out 6DoF tracking for a DIY VR headset.** Two global-shutter cameras plus an IMU on a
+Raspberry Pi 5 or Jetson Orin Nano, and the headset tracks itself in space with no base
+stations. insight-vio is a stereo visual-inertial odometry stack built around a hand-written
+**MSCKF** (Multi-State Constraint Kalman Filter), with every piece of estimation maths written
+from scratch in numpy.
 
-* Lie-group maths (SO(3)/SE(3) exp/log, Jacobians, Hamilton quaternions, JPL conversion)
-* FAST-9 corner detector with Shi-Tomasi scoring, NMS and grid bucketing
-* pyramidal Lucas-Kanade (KLT) optical flow with forward-backward checking and gyro-aided prediction
-* on-manifold IMU preintegration (Forster et al.) with bias Jacobians and covariance
-* MSCKF with a sliding window of camera clones, Gauss-Newton inverse-depth triangulation,
-  null-space projection, chi-squared gating, QR measurement compression and stereo
-* configurable IMU-camera extrinsics and time offset, Kalibr import
-* synthetic head-motion simulator (IMU + landmarks + a ray-cast image renderer), EuRoC
-  loader, and ATE/RPE evaluation
-* hardware layer: BMI088 / ICM-42688 SPI drivers, picamera2 / GStreamer camera sources,
-  time-sync tools, a UDP pose protocol, OpenXR/Monado notes and a web trajectory viewer
+<p align="center">
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#results">Results</a> ·
+  <a href="#status">Status</a> ·
+  <a href="docs/msckf.md">Full derivation</a> ·
+  <a href="docs/hardware.md">Hardware build</a>
+</p>
 
-OpenCV is used only for camera I/O and PNG decoding. It is not used for any of the VIO maths.
+<p align="center">
+  <img src="docs/assets/trajectory.png" alt="Top-down trajectory: ground truth, MSCKF estimate and IMU-only dead reckoning on a 30 s synthetic run" width="58%">
+</p>
+<p align="center">
+  <img src="docs/assets/ate_over_time.png" alt="Position error over time on a log scale: IMU-only grows to about 90 m, MSCKF stays below 1 cm" width="80%">
+</p>
+<p align="center"><sub>Real output of <code>docs/assets/make_figures.py</code>: 30 s synthetic head motion
+(seed 0), stereo, 0.5 px track noise. The MSCKF stays at 0.50 cm ATE RMSE while integrating
+the same IMU data alone drifts 25.9 m RMSE (≈ 90 m by the end). Synthetic data, not hardware.</sub></p>
 
-> **Honest status:** the algorithms are implemented and tested on synthetic data on a
-> desktop PC (numbers below). The pipeline has **not yet been run on EuRoC or on real
-> headset hardware**, and the Python implementation is **not real-time** on a Pi 5 (about
-> 0.45 s per stereo frame on a desktop CPU). Real-time use needs the planned C++ port. See
-> [Hardware validation / TODO](#hardware-validation--todo-for-the-author).
+## Highlights
 
-<!-- demo video here: headset walking a loop in a room, live trajectory in the web viewer -->
+- **From-scratch MSCKF** in numpy: sliding window of 11 camera clones, Gauss-Newton inverse-depth
+  triangulation, null-space projection, χ² gating, QR compression, Joseph-form update.
+- **0.50 cm ATE** on a 30 s stereo synthetic run; **0.45 cm** with the full ray-cast image →
+  FAST/KLT → MSCKF pipeline (vs 25.9 m for IMU-only dead reckoning).
+- **Own vision front-end**: FAST-9 + Shi-Tomasi with grid bucketing, pyramidal KLT with
+  forward-backward checks and a gyro rotation prior, epipolar-checked stereo matching.
+- **On-manifold IMU preintegration** (Forster et al.) with analytic bias Jacobians, verified
+  against finite differences in the test suite.
+- **CI-tested end to end** on Python 3.10 and 3.12: 62 tests, including ATE bounds and outlier rejection.
+- **Hardware path laid out**: BMI088 / ICM-42688 SPI drivers, picamera2 / GStreamer sources,
+  Kalibr import, an 84-byte UDP pose protocol and OpenXR/Monado notes.
+- OpenCV is used only for camera I/O and PNG decoding, never for the VIO maths.
 
----
+## Quickstart
+
+```bash
+git clone https://github.com/coopersimpson101-debug/insight-vio && cd insight-vio
+pip install numpy pyyaml pytest
+python -m pytest -q                                                   # ~2-3 min, includes end-to-end VIO
+python scripts/run_synthetic.py --duration 30 --out results/synthetic  # prints ATE, writes trajectory.html
+python scripts/run_synthetic.py --duration 5 --images                 # full image pipeline (slow)
+```
+
+<details>
+<summary><b>More: streaming, benchmarks, EuRoC, regenerating figures</b></summary>
+
+Stream poses to a runtime or viewer without hardware:
+
+```bash
+python scripts/live_viewer.py &            # http://localhost:8080
+python examples/stream_synthetic.py --duration 30
+python examples/udp_receiver.py            # what a Monado driver would see
+python scripts/bench.py                    # per-stage timings on your machine
+```
+
+EuRoC (several GB, not run in CI):
+
+```bash
+scripts/download_euroc.sh MH_01_easy V1_01_easy
+pip install opencv-python-headless                   # PNG decoding only
+python scripts/run_euroc.py data/euroc/MH_01_easy --out results/MH_01.txt
+python scripts/evaluate.py results/MH_01.txt data/euroc/MH_01_easy
+python scripts/view_trajectory.py results/MH_01.txt --align -o results/MH_01.html
+```
+
+`run_euroc.py` initialises from ground truth by default, which isolates tracking quality.
+`--static-init` uses gravity alignment from a stationary IMU window instead.
+
+README figures (needs `matplotlib`):
+
+```bash
+python docs/assets/make_figures.py
+```
+
+</details>
+
+## Front-end in action
+
+<p align="center">
+  <img src="docs/assets/frontend_tracks.png" alt="Ray-cast stereo frame with FAST corners and KLT feature tracks overlaid" width="100%">
+</p>
+<p align="center"><sub>Frame 24 of the ray-cast synthetic room, processed by <code>VioSystem</code>
+(the same code path as live hardware). Circles are tracked FAST corners, tails are their KLT
+history; the right image is where stereo matches are searched along the epipolar line.</sub></p>
 
 ## Architecture
 
@@ -66,6 +136,9 @@ flowchart LR
   UDP --> VIEW[web viewer]
 ```
 
+<details>
+<summary><b>Repository layout</b></summary>
+
 ```
 insight_vio/
   lie.py            SO(3)/SE(3), Jacobians, Hamilton/JPL quaternions
@@ -90,18 +163,23 @@ scripts/            run_synthetic, run_euroc, evaluate, download_euroc.sh, bench
 configs/            euroc, synthetic, pi5_ov9281_bmi088, jetson_orin_icm42688
 docs/               msckf.md (full derivation), hardware.md, calibration.md,
                     udp_protocol.md, openxr_monado.md, cpp_port.md
+docs/assets/        README figures + make_figures.py that regenerates them
 ```
+
+</details>
 
 ## How it works
 
 The full derivation, matching the code line by line, is in [docs/msckf.md](docs/msckf.md).
-Summary:
 
 **State.** The IMU state `R_wb, p_wb, v_wb, b_g, b_a` plus N clones `(R_i, p_i)` of past
 IMU poses, one per camera frame (window N = 11). The error state has `15 + 6N` dimensions.
 Rotations use a right/local perturbation `R = R̂ Exp(δθ)`. Quaternions are Hamilton,
 `[w, x, y, z]`, matching Eigen, ROS, OpenXR and EuRoC. The MSCKF papers use JPL, and
 `lie.jpl_to_hamilton` documents how to convert.
+
+<details>
+<summary><b>Propagation, augmentation, measurement and update equations</b></summary>
 
 **Propagation.** IMU samples between two images are preintegrated:
 
@@ -147,46 +225,11 @@ filter:
 applied to every image. Camera-to-IMU transforms come from the config or Kalibr. Both are
 fixed parameters for now, and online estimation is on the roadmap.
 
-## Quick start
-
-```bash
-pip install numpy pyyaml pytest            # core; add opencv-python-headless for EuRoC PNGs
-python -m pytest -v                        # all tests (~2-3 min, includes end-to-end VIO)
-python scripts/run_synthetic.py --duration 30 --out results/synthetic   # writes trajectory.html
-python scripts/run_synthetic.py --duration 5 --images                  # full image pipeline
-python scripts/bench.py                    # per-stage timings on your machine
-```
-
-To stream poses to a runtime or viewer without hardware:
-
-```bash
-python scripts/live_viewer.py &            # http://localhost:8080
-python examples/stream_synthetic.py --duration 30
-python examples/udp_receiver.py            # what a Monado driver would see
-```
-
-### EuRoC
-
-```bash
-scripts/download_euroc.sh MH_01_easy V1_01_easy      # several GB, not run in CI
-pip install opencv-python-headless                   # PNG decoding only
-python scripts/run_euroc.py data/euroc/MH_01_easy --out results/MH_01.txt
-python scripts/evaluate.py results/MH_01.txt data/euroc/MH_01_easy
-python scripts/view_trajectory.py results/MH_01.txt --align -o results/MH_01.html
-```
-
-`run_euroc.py` initialises from ground truth by default, which isolates tracking
-quality. `--static-init` uses gravity alignment from a stationary IMU window instead.
+</details>
 
 ## Results
 
 ### Measured here (synthetic data, Windows 10, AMD Ryzen 5 3600, Python 3.12, numpy 2.x)
-
-All runs use the simulated head trajectory: ±0.75 m sway, ±70° yaw, ±20° pitch and roll
-nods, inside an 8 × 8 × 3 m textured room. The IMU runs at 200 Hz with EuRoC/ADIS16448
-noise and bias random walk. Initial biases are drawn at σ = 0.01 rad/s and 0.05 m/s², and
-the filter starts from a zero bias estimate. Cameras run at 20 Hz, 640×480, f = 400 px,
-with a 6.4 cm baseline. ATE is the translation RMSE after SE(3) Umeyama alignment.
 
 | run | input | ATE RMSE | ATE max | RPE (1 s) |
 |---|---|---:|---:|---:|
@@ -196,6 +239,15 @@ with a 6.4 cm baseline. ATE is the translation RMSE after SE(3) Umeyama alignmen
 | stereo, 30 s | simulated tracks, 1.5 px noise (filter σ = 3 px) | **1.34 cm** | 2.21 cm | 0.75 cm / 0.098° |
 | stereo, 20 s | **ray-cast images → FAST/KLT front-end → MSCKF** | **0.45 cm** | 0.92 cm | - |
 | IMU only (dead reckoning), 30 s | same IMU data | 25.9 m | | |
+
+<details>
+<summary><b>Simulation setup, caveats and what CI asserts</b></summary>
+
+All runs use the simulated head trajectory: ±0.75 m sway, ±70° yaw, ±20° pitch and roll
+nods, inside an 8 × 8 × 3 m textured room. The IMU runs at 200 Hz with EuRoC/ADIS16448
+noise and bias random walk. Initial biases are drawn at σ = 0.01 rad/s and 0.05 m/s², and
+the filter starts from a zero bias estimate. Cameras run at 20 Hz, 640×480, f = 400 px,
+with a 6.4 cm baseline. ATE is the translation RMSE after SE(3) Umeyama alignment.
 
 A tuning lesson from the runs above: with 1.5 px true noise but the filter set to
 σ = 1 px, ATE grew to 7.5 cm. An over-confident filter hurts more than a conservative one.
@@ -209,6 +261,8 @@ The CI tests assert the following on synthetic data: stereo ATE < 3 cm over 20 s
 measured), mono < 5 cm (0.77 cm measured), image pipeline < 3 cm over 3 s (0.31 cm
 measured), injected outliers rejected, and propagation and measurement Jacobians matching
 finite differences.
+
+</details>
 
 ### Timing (same machine, Python; `scripts/bench.py`)
 
@@ -226,7 +280,24 @@ Python version for development, recording and offline replay. [docs/cpp_port.md]
 lays out the C++/NEON port; comparable C++ MSCKF implementations run in a few
 milliseconds per frame.
 
-### EuRoC (to be filled in by the author; not run yet)
+## Status
+
+| component | status | evidence |
+|---|:---:|---|
+| Lie groups, IMU preintegration, Jacobians | ✅ | unit tests vs finite differences (CI) |
+| MSCKF back-end, stereo + mono | ✅ | synthetic ATE 0.50 cm / 0.93 cm (CI asserts < 3 / 5 cm) |
+| FAST / KLT / stereo front-end | ✅ | ray-cast image pipeline, 0.45 cm ATE |
+| UDP pose protocol, web viewer | ✅ | packet + CRC round-trip and loopback tests |
+| EuRoC benchmark | 🧪 | loader and scripts tested; sequences not run yet |
+| BMI088 / ICM-42688 drivers, camera sources | 🧪 | register decoding tested with a mock SPI bus; needs the sensor head |
+| Kalibr calibration of a real rig | ⏳ | needs hardware |
+| Real-time on Pi 5 / Jetson | ⏳ | Python ~0.45 s/frame; needs the C++ port |
+| Monado / OpenXR driver | ⏳ | design notes in [docs/openxr_monado.md](docs/openxr_monado.md) |
+
+✅ done and tested here · 🧪 code ready, simulated / not yet run on real data · ⏳ needs hardware
+
+<details>
+<summary><b>EuRoC results table (to be filled in)</b></summary>
 
 | sequence | ATE RMSE (m) | RPE 1 s (m / deg) | ms/frame | machine |
 |---|---:|---:|---:|---|
@@ -237,9 +308,10 @@ milliseconds per frame.
 | V1_02_medium | | | | |
 | V2_01_easy | | | | |
 
-## Hardware validation / TODO for the author
+</details>
 
-None of the following has been done. Each item has the exact commands to run.
+<details>
+<summary><b>Hardware validation checklist (exact commands)</b></summary>
 
 1. **EuRoC.** Fill in the table above:
    ```bash
@@ -279,7 +351,7 @@ None of the following has been done. Each item has the exact commands to run.
 
 7. **Integrate with Monado.** See [docs/openxr_monado.md](docs/openxr_monado.md).
 
-<!-- video here: side-by-side headset view and live_viewer trajectory -->
+</details>
 
 ## Roadmap
 
@@ -295,6 +367,9 @@ None of the following has been done. Each item has the exact commands to run.
 
 ## References
 
+<details>
+<summary><b>Papers this implementation follows</b></summary>
+
 * A. I. Mourikis, S. I. Roumeliotis, *A Multi-State Constraint Kalman Filter for
   Vision-aided Inertial Navigation*, ICRA 2007.
 * C. Forster, L. Carlone, F. Dellaert, D. Scaramuzza, *On-Manifold Preintegration for
@@ -307,6 +382,13 @@ None of the following has been done. Each item has the exact commands to run.
 * S. Umeyama, *Least-squares estimation of transformation parameters between two point
   patterns*, PAMI 1991.
 * M. Burri et al., *The EuRoC micro aerial vehicle datasets*, IJRR 2016.
+
+</details>
+
+## Contributing and citing
+
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). If this is useful in your
+work, please cite it using [CITATION.cff](CITATION.cff).
 
 ## License
 

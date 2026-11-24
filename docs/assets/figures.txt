@@ -1,0 +1,2 @@
+stereo 30 s seed 0: ATE rmse 0.50 cm, max 0.84 cm, IMU-only ATE 25.88 m, IMU-only final error 89.85 m
+front-end: 120 live tracks after 24 frames, median length 23 frames, max 24
