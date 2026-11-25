@@ -1,20 +1,37 @@
 # C++ port plan
 
 The Python code is structured so each module maps to one C++ translation unit with
-Eigen for the small dense algebra. Nothing below exists yet.
+Eigen for the small dense algebra. Sources live under [`cpp/`](../cpp/).
 
-| Python module | C++ target | notes |
+| Python module | C++ target | status |
 |---|---|---|
-| `lie.py` | `lie.hpp` (header-only) | `Eigen::Matrix3d`, keep right-perturbation convention; port `tests/test_lie.py` 1:1 to GoogleTest |
-| `imu.py` | `preintegration.{hpp,cpp}` | fixed-size `Matrix<double,9,9>`; ~0.14 ms/sample in Python -> < 1 µs expected |
-| `features.py` | `fast.cpp` | FAST with the 4-compass early-rejection test, NEON (Pi 5 / Orin are Cortex-A76 / A78AE) |
-| `klt.py` | `klt.cpp` | per-point loops are cache friendly; precompute template + gradient once per level; NEON bilinear; or OpenCV `calcOpticalFlowPyrLK` as a reference to compare against |
-| `frontend.py` | `frontend.cpp` | run left/right tracking on two threads |
-| `triangulation.py` | `triangulation.cpp` | 3x3 normal equations, unrolled |
-| `msckf.py` | `msckf.{hpp,cpp}` | dynamic `MatrixXd` for P (max 15 + 6*11 = 81); Householder QR for null-space and compression; only touch the needed covariance blocks |
-| `udp.py` | `pose_udp.cpp` | packed struct (see `docs/udp_protocol.md`) |
-| `hw/imu_spi.py` | `imu_spi.cpp` | `spidev` ioctl + libgpiod v2 edge events with kernel timestamps |
-| `hw/cameras.py` | `camera_libcamera.cpp` | libcamera C++ API directly (no picamera2) |
+| `lie.py` | `include/insight_vio/lie.hpp` (header-only) | done — GoogleTest port of `tests/test_lie.py` |
+| `imu.py` | `preintegration.{hpp,cpp}` | done — golden fixtures from the synthetic IMU + Jacobian tests |
+| `triangulation.py` | `triangulation.{hpp,cpp}` | done — exact / noisy / behind-camera GoogleTests |
+| `features.py` | `fast.cpp` | not started — FAST with 4-compass early rejection, NEON |
+| `klt.py` | `klt.cpp` | not started — template+gradient precompute; NEON bilinear or OpenCV reference |
+| `frontend.py` | `frontend.cpp` | not started — left/right tracking on two threads |
+| `msckf.py` | `msckf.{hpp,cpp}` | not started — `MatrixXd` P, Householder QR null-space / compression |
+| `udp.py` | `pose_udp.cpp` | not started — packed struct (see `docs/udp_protocol.md`) |
+| `hw/imu_spi.py` | `imu_spi.cpp` | not started — `spidev` + libgpiod v2 |
+| `hw/cameras.py` | `camera_libcamera.cpp` | not started — libcamera C++ API |
+
+## Build and test
+
+```bash
+cd cpp
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+./build/insight_vio_microbench   # optional; prints measured us/call on this machine
+```
+
+Eigen 3.4 and GoogleTest are fetched by CMake (`FetchContent`). Regenerate IMU
+goldens after changing the Python simulator or preintegrator:
+
+```bash
+python scripts/dump_cpp_goldens.py
+```
 
 ## Threading model
 
@@ -32,14 +49,16 @@ camera thread(s) (30 Hz)  ->  front-end thread  ->  filter thread  ->  UDP
 | KLT, 120 points, 4 levels | 115 ms | 1-2 ms |
 | stereo front-end per frame | 400 ms | 4-8 ms |
 | MSCKF update | 60-75 ms | 1-3 ms |
+| SO(3) exp+log / IMU integrate (desktop C++, see microbench) | — | measured locally; do not invent Pi numbers |
 
-The C++ numbers are rough expectations from comparable open-source systems
+The C++ frame-budget numbers are rough expectations from comparable open-source systems
 (OpenVINS, MSCKF-VIO, Basalt report a few ms per frame on desktop CPUs) and must be
-replaced with measurements.
+replaced with measurements. The microbench only times the math already ported.
 
 ## Validation strategy
 
-* Golden tests: dump inputs/outputs of every Python module (`np.save`) on the synthetic
-  sequence, assert the C++ version matches to 1e-9 (math) / 1e-3 px (KLT).
-* The end-to-end ATE tests from `tests/test_msckf.py` run against the C++ library through
-  pybind11 bindings.
+* Golden tests: dump inputs/outputs of every Python module (`scripts/dump_cpp_goldens.py`)
+  on the synthetic sequence, assert the C++ version matches to 1e-9 (math) / 1e-3 px (KLT).
+* Port unit tests 1:1 where practical (Lie, triangulation).
+* The end-to-end ATE tests from `tests/test_msckf.py` will eventually run against the C++
+  library through pybind11 bindings (not started).
