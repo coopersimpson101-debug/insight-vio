@@ -118,8 +118,12 @@ class PoseSender:
         self.sock.close()
 
 
-def receive_forever(port: int = 5555, host: str = "0.0.0.0", callback=print):
-    """Blocking receiver loop (used by examples/udp_receiver.py and the web viewer)."""
+def receive_forever(port: int = 5555, host: str = "127.0.0.1", callback=print):
+    """Blocking receiver loop (used by examples/udp_receiver.py and the web viewer).
+
+    Listens on localhost by default. Pass ``host="0.0.0.0"`` (``--host 0.0.0.0`` in the
+    scripts) only when the headset streams poses from another machine on a trusted LAN.
+    """
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind((host, port))
     while True:

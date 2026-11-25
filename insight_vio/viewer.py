@@ -85,7 +85,8 @@ def write_html(path: str, trajs: dict, title: str = "insight-vio", stat: str = "
         f.write(render_html(trajs, title, stat))
 
 
-def serve_live(http_port: int = 8080, udp_port: int = 5555, max_points: int = 3000):  # pragma: no cover
+def serve_live(http_port: int = 8080, udp_port: int = 5555, max_points: int = 3000,
+               host: str = "127.0.0.1"):  # pragma: no cover
     from .udp import packet_rotation, receive_forever
     pts, last = [], {"R": np.eye(3), "pkt": None}
     lock = threading.Lock()
@@ -97,7 +98,7 @@ def serve_live(http_port: int = 8080, udp_port: int = 5555, max_points: int = 30
             last["R"] = packet_rotation(pkt)
             last["pkt"] = pkt
 
-    threading.Thread(target=receive_forever, args=(udp_port, "0.0.0.0", on_packet),
+    threading.Thread(target=receive_forever, args=(udp_port, host, on_packet),
                      daemon=True).start()
 
     class H(BaseHTTPRequestHandler):
@@ -121,5 +122,5 @@ def serve_live(http_port: int = 8080, udp_port: int = 5555, max_points: int = 30
             self.end_headers()
             self.wfile.write(body)
 
-    print(f"viewer on http://0.0.0.0:{http_port}  (listening for UDP poses on :{udp_port})")
-    ThreadingHTTPServer(("0.0.0.0", http_port), H).serve_forever()
+    print(f"viewer on http://{host}:{http_port}  (listening for UDP poses on {host}:{udp_port})")
+    ThreadingHTTPServer((host, http_port), H).serve_forever()

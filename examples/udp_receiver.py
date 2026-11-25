@@ -27,4 +27,7 @@ def show(p):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=5555)
-    receive_forever(ap.parse_args().port, callback=show)
+    ap.add_argument("--host", default="127.0.0.1",
+                    help="interface to listen on; 0.0.0.0 to accept poses from the LAN")
+    a = ap.parse_args()
+    receive_forever(a.port, a.host, callback=show)

@@ -84,7 +84,7 @@ faster than the Pi 5's, and the C++ port could move FAST/KLT to CUDA or VPI.
 python scripts/kalibr_to_config.py camchain-imucam.yaml imu.yaml \
     --base configs/pi5_ov9281_bmi088.yaml -o configs/my_headset.yaml
 python scripts/run_live.py --config configs/my_headset.yaml --record ~/sessions/s1
-python scripts/live_viewer.py          # on the Pi, then browse to http://<pi>:8080
+python scripts/live_viewer.py --host 0.0.0.0   # on the Pi, then browse to http://<pi>:8080 (trusted LAN only)
 ```
 
 `--record` writes an EuRoC-format folder that can be replayed with
