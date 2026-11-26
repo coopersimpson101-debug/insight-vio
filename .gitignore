@@ -7,6 +7,10 @@ __pycache__/
 venv/
 build/
 dist/
+# C++
+cpp/build/
+cpp/build-win/
+compile_commands.json
 # data / outputs
 data/
 results/

@@ -362,7 +362,7 @@ milliseconds per frame.
 - [ ] first-estimate Jacobians / OC-EKF for yaw consistency
 - [ ] SLAM features (long-lived landmarks in the state) and zero-velocity updates
 - [ ] IMU-rate pose output (500 Hz) for low-latency rendering
-- [ ] C++17 + Eigen port with pybind11 bindings and golden tests ([plan](docs/cpp_port.md))
+- [ ] C++17 + Eigen port with pybind11 bindings and golden tests ([plan](docs/cpp_port.md); `lie` / preintegration / triangulation landed under `cpp/`)
 - [ ] Monado driver
 - [ ] hardware validation on Pi 5 and Jetson Orin Nano
 

@@ -8,9 +8,15 @@ Thanks for your interest! Bug reports, fixes, docs and hardware results are all 
    ```bash
    python -m pytest -q
    ```
+   If you touch `cpp/`, also build and run the C++ tests:
+   ```bash
+   cmake -S cpp -B cpp/build -DCMAKE_BUILD_TYPE=Release && cmake --build cpp/build
+   ctest --test-dir cpp/build --output-on-failure
+   ```
 4. Add or update tests for behaviour changes, and keep the README honest: only report numbers
    you measured, and say on what machine or hardware.
 5. Code style: PEP 8, type hints where they help, 4-space indentation (see `.editorconfig`).
+   C++ is C++17 with Eigen; prefer matching the Python module behaviour and tolerances.
 
 Hardware results are especially valuable. Please include the exact command, config file,
 hardware and commit hash so others can reproduce them.

@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- C++17 + Eigen scaffold under `cpp/`: header-only `lie.hpp`, Forster preintegration,
+  triangulation, GoogleTests with IMU golden fixtures, and a CI `cpp` job
+
 ## [0.1.0] - 2026-11-25
 
 First public release of a hand-written MSCKF visual-inertial odometry stack for inside-out VR headset tracking.

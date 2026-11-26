@@ -28,3 +28,24 @@ jobs:
         run: python scripts/run_synthetic.py --duration 20
       - name: Shell script lint
         run: bash -n scripts/download_euroc.sh
+
+  cpp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build tools
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq build-essential cmake ninja-build
+      - name: Configure
+        working-directory: cpp
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        working-directory: cpp
+        run: cmake --build build
+      - name: Test
+        working-directory: cpp
+        run: ctest --test-dir build --output-on-failure
+      - name: Microbench
+        working-directory: cpp
+        run: ./build/insight_vio_microbench
